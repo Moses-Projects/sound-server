@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.7
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
+import pygame
 import random
 import re
 import time
@@ -10,8 +11,11 @@ serverPort = 8080
 BaseHTTPRequestHandler.server_version = "Monkeyness Sounds Server 1.0"
 BaseHTTPRequestHandler.sys_version = ""
 
+base_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], 'sounds')
 master_volume = 100
-base_dir = '/opt/sounds/sounds'
+pygame.mixer.pre_init(buffer=3096)
+pygame.init()
+pygame.mixer.init()
 
 class MyServer(BaseHTTPRequestHandler):
 	def do_GET(self):
@@ -55,6 +59,25 @@ class MyServer(BaseHTTPRequestHandler):
 			new_volume = int(master_base * volume /100) + 70
 			return new_volume
 		
+		def play_mpg123(sound_file, volume=None):
+			global master_volume
+			if type(volume) is None:
+				volume = master_volume
+			os.system('sudo amixer cset numid=1 {}%'.format(convert_volume(volume)))
+			os.system('mpg123 -q ' + sound_path)
+			os.system('sudo amixer cset numid=1 {}%'.format(master_volume))
+			
+		def play_pygame(sound_file, volume=None):
+			global master_volume
+			if type(volume) is None:
+				volume = master_volume / 100
+			else:
+				volume = convert_volume(volume) / 100
+			pygame.mixer.music.set_volume(volume)
+			pygame.mixer.music.load(sound_file)
+			pygame.mixer.music.play()
+			
+		
 		# Parse URI
 		original_path = re.sub(r'\?.*$', '', self.path)
 		query_string = ''
@@ -76,8 +99,7 @@ class MyServer(BaseHTTPRequestHandler):
 				master_volume = 0
 				if new_volume > 0:
 					master_volume = int(new_volume * .3 + 70)
-				os.system('sudo amixer cset numid=1 {}%'.format(master_volume))
-				os.system('mpg123 -q /opt/sounds/sounds/apple/tink.mp3')
+				play_mpg123('/opt/sounds-server/sounds/apple/tink.mp3')
 				return send_web_page(self, 200, "Volume set to {}".format(new_volume))
 			else:
 				return send_web_page(self, 403, "Invalid volume value: {}".format(new_volume))
@@ -137,17 +159,16 @@ class MyServer(BaseHTTPRequestHandler):
 			# Play existing sounds
 			if os.path.exists(sound_path):
 # 				print("Trying to play {}".format(sound_path))
+				volume = master_volume
 				volume_message = ''
 				if 'volume' in args:
 					volume = int(args['volume'])
 					if volume < 0 or volume > 100:
 						return send_web_page(self, 403, "Invalid volume value: {}".format(volume))
 					volume_message = ' at volume {}'.format(volume)
-					os.system('sudo amixer cset numid=1 {}%'.format(convert_volume(volume)))
 				send_web_page(self, 200, "Playing sound{}: {}".format(volume_message, original_path))
-				os.system('mpg123 -q ' + sound_path)
-				if 'volume' in args:
-					os.system('sudo amixer cset numid=1 {}%'.format(master_volume))
+# 				play_mpg123(sound_path, volume)
+				play_pygame(sound_path, volume)
 				return
 		
 			# Sound not found
@@ -160,7 +181,7 @@ class MyServer(BaseHTTPRequestHandler):
 if __name__ == "__main__":		  
 	webServer = HTTPServer((hostName, serverPort), MyServer)
 	print("Server started http://%s:%s" % (hostName, serverPort))
-	os.system('sudo amixer cset numid=1 {}%'.format(master_volume))
+# 	os.system('sudo amixer cset numid=1 {}%'.format(master_volume))
 	
 	try:
 		webServer.serve_forever()
