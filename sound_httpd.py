@@ -167,8 +167,8 @@ class MyServer(BaseHTTPRequestHandler):
 						return send_web_page(self, 403, "Invalid volume value: {}".format(volume))
 					volume_message = ' at volume {}'.format(volume)
 				send_web_page(self, 200, "Playing sound{}: {}".format(volume_message, original_path))
-# 				play_mpg123(sound_path, volume)
-				play_pygame(sound_path, volume)
+				play_mpg123(sound_path, volume)
+# 				play_pygame(sound_path, volume)
 				return
 		
 			# Sound not found
